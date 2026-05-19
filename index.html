@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bilingual GK Quiz</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+:root {
+  /* 2.B. Background Strategy */
+  --bg-main: #e8f5e9;       /* Light Green (Main Page Background) */
+  --bg-paper: #fffde7;      /* Light Yellow (Question Paper Area) */
+  --bg-filler: #fff3e0;     /* Light Peach (Empty/Filler Spaces) */
+  
+  --text-color: #000000;    /* Black Typography */
+  --accent-color: #2e7d32;  /* Dark Green for headers/buttons */
+
+  /* 2.B. Option Styling */
+  --opt-default-bg: #fce4ec;   /* Pink background */
+  --opt-border: #f8bbd0;       /* Pink border */
+  --opt-selected-bg: #d32f2f;  /* Red background (Selected State) */
+  --opt-selected-text: #ffffff; /* White text on Red */
+  
+  --timer-color: #c62828;   /* Red for timer */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-main); /* Light Green Background */
+  color: var(--text-color);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+.main-wrapper {
+  width: 100%;
+  max-width: 800px;
+  background-color: var(--bg-filler); /* Light Peach Filler/Frame */
+  min-height: 100vh;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  display: none;
+  padding: 20px;
+  width: 100%;
+}
+.screen.active { display: block; }
+
+/* General Cards (Landing & Result) */
+.card {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  text-align: center;
+  margin-top: 40px;
+}
+
+h1 { color: var(--accent-color); margin-bottom: 5px; }
+.subtitle { color: #555; margin-bottom: 25px; }
+
+/* Sticky Header with Timer & Language Toggle */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-main);
+  padding: 10px 20px;
+  border-bottom: 2px solid var(--accent-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin: 0 -20px 20px -20px;
+}
+
+.timer-box {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--timer-color);
+  background: rgba(255,255,255,0.8);
+  padding: 5px 15px;
+  border-radius: 20px;
+}
+
+/* Question Paper Area */
+.question-container {
+  background-color: var(--bg-paper); /* Light Yellow Paper */
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #fae7b5;
+  margin-bottom: 20px;
+}
+
+.question-text {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: var(--text-color); /* Black text */
+  white-space: pre-wrap; /* Preserves A. B. C. D. line breaks */
+}
+
+/* Options Styling */
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr; 
+  gap: 10px;
+}
+
+.option {
+  padding: 12px 15px;
+  border-radius: 6px;
+  background-color: var(--opt-default-bg); /* Pink */
+  border: 1px solid var(--opt-border); /* Pink border */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.option:hover {
+  filter: brightness(0.95);
+}
+
+/* Selected State: Red Background */
+.option.selected {
+  background-color: var(--opt-selected-bg); /* Red */
+  color: var(--opt-selected-text); /* White text */
+  border-color: #b71c1c;
+}
+
+/* Buttons */
+button {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s;
+}
+button:hover { background-color: #1b5e20; }
+
+/* Review Section */
+.review-item {
+  background: white;
+  border-bottom: 1px solid #eee;
+  padding: 15px;
+  text-align: left;
+}
+.status-correct { color: green; font-weight: bold; }
+.status-wrong { color: #d32f2f; font-weight: bold; }
+.status-unanswered { color: #f57c00; font-weight: bold; }
+.explanation {
+  background: #f1f8e9;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #333;
+}
+
+@media (min-width: 600px) {
+  .options-grid { grid-template-columns: 1fr 1fr; }
+}
+
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+// =========================================
+// 1. CONFIGURATION
+// =========================================
+const APP_TITLE = "Bilingual GK Quiz";
+const APP_SUBTITLE = "Select language and test your knowledge";
+const DEFAULT_CONFIG = {"totalTime": 480, "marksCorrect": 2.0, "marksWrong": -0.5, "maxQuestions": 0};
+const DEFAULT_LANGUAGE = 'en';
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4OuRL-wnpvEtZPUcO61v6IIWpHcffUdVbMSteEZoVBU9SJn8niXq-yo7bAY785TBp/exec";
+const DEFAULT_RAW_TEXT = "";
+
+window.__PREPARSED_JSON__ = [
+  {
+    "id": 1,
+    "question_bn": "ধ্রুপদ কণ্ঠশৈলীর সঞ্চারী এবং আভোগ অংশ দুটি পরিবেশন করার সময় সাধারণত নিচের কোন বাদ্যযন্ত্রটির সহযোগিতা নেওয়া হয়?",
+    "options_bn": [
+      "তবলা",
+      "সারঙ্গি",
+      "পাখোয়াজ",
+      "ভায়োলিন"
+    ],
+    "explanation_bn": "ধ্রুপদ হলো হিন্দুস্তানি সঙ্গীতের সবচেয়ে প্রাচীন ও গম্ভীর কণ্ঠশৈলী, যার চারটি অংশ রয়েছে—স্থায়ী, অন্তরা, সঞ্চারী এবং আভোগ। এই শৈলীটি প্রধানত তানপুরা এবং পাখোয়াজ সহযোগে পরিবেশন করা হয়।",
+    "question_en": "Which of the following instruments is generally used as an accompaniment during the performance of the Sanchari and Abhog parts of the Dhrupad vocal style?",
+    "options_en": [
+      "Tabla",
+      "Sarangi",
+      "Pakhavaj",
+      "Violin"
+    ],
+    "explanation_en": "Dhrupad is the oldest and most profound vocal style of Hindustani music, consisting of four parts—Sthayi, Antara, Sanchari, and Abhog. This style is performed accompanied by Tanpura and Pakhavaj.",
+    "correctIndex": 2
+  },
+  {
+    "id": 2,
+    "question_bn": "ভারতীয় শাস্ত্রীয় সঙ্গীতের ইতিহাসের প্রেক্ষিতে, নিচের কোন যুগলটি তাদের কাঠামোগত বৈশিষ্ট্য ও গায়নশৈলীর দিক থেকে উত্তর ও দক্ষিণ ভারতের সঙ্গীত ধারার মধ্যে সরাসরি মিল প্রদর্শন করে?",
+    "options_bn": [
+      "ধ্রুপদ এবং গীতম",
+      "খেয়াল এবং কৃতি",
+      "তরানা এবং তিল্লানা",
+      "ঠুমরি এবং কীর্তনম"
+    ],
+    "explanation_bn": "হিন্দুস্তানি সঙ্গীতের 'তরানা' শৈলীটি অর্থহীন ধ্বনিবর্ণ ব্যবহার করে উচ্চ গতিতে গাওয়া হয়। অন্যদিকে, দক্ষিণ ভারতের কর্নাটিক সঙ্গীতের 'তিল্লানা' শৈলীটি সরাসরি উত্তর ভারতের এই তরানা থেকে অনুপ্রাণিত এবং এর সাথে সাদৃশ্যপূর্ণ।",
+    "question_en": "In the context of the history of Indian Classical Music, which of the following pairs demonstrates a direct connection or structural similarity between the northern and southern Indian musical forms through their creation?",
+    "options_en": [
+      "Dhrupad and Gitam",
+      "Khayal and Kriti",
+      "Tarana and Tillana",
+      "Thumri and Kirtanam"
+    ],
+    "explanation_en": "The Tarana style of Hindustani music is sung at a high speed using meaningless syllables. On the other hand, the 'Tillana' style of Southern Carnatic music is directly inspired by and closely resembles this northern Tarana form.",
+    "correctIndex": 2
+  },
+  {
+    "id": 3,
+    "question_bn": "কর্ণ্নাটিক সঙ্গীত ঐতিহ্যের সবচেয়ে উন্নত, কাঠামোগতভাবে জটিল এবং উচ্চ সাহিত্যিক গভীরতাসম্পন্ন পেশাদার পরিবেশনা শৈলীটিকে কী বলা হয়?",
+    "options_bn": [
+      "কীর্তনম",
+      "কৃতি",
+      "স্বরজাতি",
+      "সুলাদি"
+    ],
+    "explanation_bn": "প্রদত্ত সারণি অনুযায়ী কর্নাটিক সঙ্গীতের বিভিন্ন শৈলীর মধ্যে 'কৃতি' (Kriti) হলো সর্বোচ্চ বিকশিত ও জটিল শৈলী, যার সাহিত্যিক গভীরতা অনেক বেশি এবং এটি পেশাদার পরিবেশনায় ব্যবহৃত হয়।",
+    "question_en": "What is the most highly developed, complex, and literary-rich professional performance style within the Carnatic music tradition called?",
+    "options_en": [
+      "Kirtanam",
+      "Kriti",
+      "Svarajati",
+      "Suladi"
+    ],
+    "explanation_en": "Among the various styles of Carnatic music, 'Kriti' is the most highly developed and complex form, featuring rich literary depth and used primarily in professional performances.",
+    "correctIndex": 1
+  },
+  {
+    "id": 4,
+    "question_bn": "উত্তর ভারতের হিন্দুস্তানি শাস্ত্রীয় সঙ্গীত এবং দক্ষিণ ভারতের কর্নাটিক শাস্ত্রীয় সঙ্গীতের রাগের সময় তত্ত্ব (Time Theory of Ragas) সংক্রান্ত নিয়মের প্রধান পার্থক্যটি কী?",
+    "options_bn": [
+      "কর্ণাটিক সঙ্গীতে রাগের সময় কঠোরভাবে মানা হয়, কিন্তু হিন্দুস্তানি সঙ্গীতে এটি কিছুটা নমনীয়",
+      "হিন্দুস্তানি সঙ্গীতে রাগের নির্দিষ্ট সময় কঠোরভাবে মানা হয়, অন্যদিকে কর্নাটিক সঙ্গীতে এটি কিছুটা নমনীয়",
+      "উভয় পদ্ধতিতেই ভুল সময়ে ভুল রাগ গাইলে সেই সঙ্গীতকে সমানভাবে 'অশুদ্ধ' মনে করা হয়",
+      "কর্ণাটিক সঙ্গীতে শুধুমাত্র ভোরের রাগ গাওয়ার নিয়ম আছে, কিন্তু হিন্দুস্তানি সঙ্গীতে সময়ের কোনো অস্তিত্ব নেই"
+    ],
+    "explanation_bn": "হিন্দুস্তানি সঙ্গীতে রাগের নির্দিষ্ট সময় কঠোরভাবে মেনে চলা হয়। অন্যদিকে দক্ষিণ ভারতের কর্নাটিক সঙ্গীতের ক্ষেত্রে রাগের এই সময় তত্ত্বের নিয়মটি কিছুটা নমনীয়।",
+    "question_en": "What is the primary difference regarding the Time Theory of Ragas between the North Indian Hindustani and South Indian Carnatic classical music traditions?",
+    "options_en": [
+      "The time theory is strictly observed in Carnatic music, but it is flexible in Hindustani music",
+      "The specific time of a raga is strictly followed in Hindustani music, whereas it is relatively flexible in Carnatic music",
+      "In both systems, performing a raga at the wrong time is equally considered 'unacceptable'",
+      "Carnatic music only permits the rendition of morning ragas, while time has no relevance in Hindustani music"
+    ],
+    "explanation_en": "In the Hindustani tradition of North India, the specific timing assigned to ragas is strictly observed. Conversely, in the Carnatic music tradition of South India, this time-theory rule is comparatively flexible.",
+    "correctIndex": 1
+  },
+  {
+    "id": 5,
+    "question_bn": "পণ্ডিত জসরাজ মেওয়াতি ঘরানার গায়কিতে যে 'জসরঙ্গি জুগলবন্দি' শৈলীটি জনপ্রিয় করেন, তার প্রধান সাঙ্গীতিক বা টেকনিক্যাল বৈশিষ্ট্যটি কী ছিল?",
+    "options_bn": [
+      "একজন পুরুষ ও একজন মহিলা শিল্পী একই রাগে এবং একই স্কেলে ডুয়েট গাইতেন",
+      "উভয় শিল্পী কোনো বাদ্যযন্ত্র ছাড়াই শুধুমাত্র তানপুরার সাথে ধ্রুপদ আলাপ করতেন",
+      "একজন পুরুষ ও একজন মহিলা শিল্পী সম্পূর্ণ আলাদা স্কেলে দুটি ভিন্ন রাগ গাইতেন, যা একত্রে একটি অনন্য হারমনিক ইফেক্ট সৃষ্টি করত",
+      "শাস্ত্রীয় রাগের কাঠামোর মধ্যে পারসিক গজলের সুরকে হুবহু নকল করা হতো"
+    ],
+    "explanation_bn": "মেওয়াতি ঘরানার পণ্ডিত জসরাজ একটি বিশেষ জুগলবন্দি পদ্ধতির প্রবর্তন করেন। এই পদ্ধতিতে একজন পুরুষ ও একজন মহিলা শিল্পী একসাথে সম্পূর্ণ আলাদা স্কেলে আলাদা আলাদা রাগ গাইতে পারেন, যা একত্রে একটি অনন্য হারমনিক ইফেক্ট বা সমন্বয় তৈরি করে।",
+    "question_en": "What was the core technical or melodic characteristic of the 'Jasrongi Jugalbandi' vocal style popularized by Pandit Jasraj?",
+    "options_en": [
+      "A male and a female artist performed a duet in the exact same raga and scale",
+      "Both artists performed a Dhrupad Alap accompanied strictly by Tanpura without instruments",
+      "A male and a female artist performed two different ragas simultaneously on completely separate scales, creating a unique harmonic effect",
+      "Replicating the exact melodies of Persian Ghazals within the framework of classical ragas"
+    ],
+    "explanation_en": "Pandit Jasraj of the Mewati Gharana introduced a unique Jugalbandi method. In this technique, a male and a female artist sing different ragas simultaneously on completely different scales, which combined creates a unique harmonic effect or coordination.",
+    "correctIndex": 2
+  },
+  {
+    "id": 6,
+    "question_bn": "ধ্রুপদ কণ্ঠশৈলীর কাঠামোগত বিবর্তনের ইতিহাসে, এই ধারার ঐতিহ্যবাহী রচনা ও গম্ভীর গায়নরীতিকে মূলত কোন বিশেষ পরিবার ও ঘরানা প্রসারিত ও দীর্ঘকাল ধরে রক্ষা করেছিল?",
+    "options_bn": [
+      "মেওয়াতি ঘরানা ও পণ্ডিত জসরাজ",
+      "ডাগর পরিবার এবং দরভাঙ্গা ঘরানা",
+      "ভেন্ডি বাজার ঘরানা ও লতা মঙ্গেশকর",
+      "কিরানা ঘরানা ও সোয়াই গান্ধর্ব"
+    ],
+    "explanation_bn": "ধ্রুপদকে প্রসারিত করে দীর্ঘকাল ধরে প্রচার ও রক্ষা করে মূলত ডাগর পরিবার এবং বিহারের দরভাঙ্গা ঘরানা। ধ্রুপদে আলাপ অংশটি খুব দীর্ঘ হয় এবং এটি তানপুরা ও পাখোয়াজ সহযোগে গাওয়া হয়।",
+    "question_en": "In the history of the structural evolution of the Dhrupad vocal style, which specific family or Gharana primarily expanded and preserved its traditional compositions and grave singing style?",
+    "options_en": [
+      "Mewati Gharana and Pandit Jasraj",
+      "Dagar family and Darbhanga Gharana",
+      "Bhendi Bazar Gharana and Lata Mangeshkar",
+      "Kirana Gharana and Sawai Gandharva"
+    ],
+    "explanation_en": "The traditional form of Dhrupad was expanded and preserved over time primarily by the Dagar family and the Darbhanga Gharana of Bihar. In Dhrupad, the Alap section is very long and performed accompanied by Tanpura and Pakhavaj.",
+    "correctIndex": 1
+  },
+  {
+    "id": 7,
+    "question_bn": "মাইহার ঘরানার প্রতিষ্ঠাতা উস্তাদ আলাউদ্দিন খাঁ-র নিজস্ব পারিবারিক বংশধারা বা রক্ত সম্পর্কের উত্তরাধিকারী হিসেবে যথাক্রমে সরোদ (Sarod) ও সুরবাহার (Surbahar) বাদ্যযন্ত্রে অপ্রতিদ্বন্দ্বী খ্যাতি অর্জন করেছিলেন কোন দুই শিল্পী?",
+    "options_bn": [
+      "পণ্ডিত রবিশঙ্কর এবং নিখিল ব্যানার্জি",
+      "আলি আকবর খাঁ এবং আনাপূর্ণা দেবী",
+      "পন্নালাল ঘোষ এবং ভি.জি. যোগ",
+      "সুলতান খাঁ এবং উস্তাদ রশিদ খাঁ"
+    ],
+    "explanation_bn": "মাইহার ঘরানার প্রতিষ্ঠাতা উস্তাদ আলাউদ্দিন খাঁ-র রক্তের সম্পর্কের উত্তরাধিকারীদের মধ্যে তাঁর পুত্র আলি আকবর খাঁ ছিলেন সরোদের (Sarod) কিংবদন্তি শিল্পী এবং তাঁর কন্যা আনাপূর্ণা দেবী ছিলেন সুরবাহার (Surbahar) বাদক।",
+    "question_en": "As the direct lineage or biological descendants of Ustad Allaudin Khan (the founder of the Maihar Gharana), which two artists achieved unrivaled acclaim in playing the Sarod and Surbahar respectively?",
+    "options_en": [
+      "Pandit Ravi Shankar and Nikhil Banerjee",
+      "Ali Akbar Khan and Annapurna Devi",
+      "Pannalal Ghosh and V.G. Jog",
+      "Sultan Khan and Ustad Rashid Khan"
+    ],
+    "explanation_en": "Among the immediate family descendants of Ustad Allaudin Khan, the founder of the Maihar Gharana, his son Ali Akbar Khan became a legend of the Sarod, and his daughter Annapurna Devi mastered the Surbahar.",
+    "correctIndex": 1
+  },
+  {
+    "id": 8,
+    "question_bn": "কিরানা ঘরানার সর্বশ্রেষ্ঠ প্রতিনিধি, ভারতরত্ন পণ্ডিত ভীমসেন জোশির সাঙ্গীতিক দীক্ষা ও কঠোর গুরুমুখী শিক্ষা মূলত কোন মহান ওস্তাদ বা গুরুর তত্ত্বাবধানে সম্পন্ন হয়েছিল?",
+    "options_bn": [
+      "আব্দুল করিম খাঁ",
+      "সোয়াই গান্ধর্ব",
+      "আব্দুল ওয়াহিদ খাঁ",
+      "কুমার গন্ধর্ব"
+    ],
+    "explanation_bn": "কর্ণাটক থেকে আসা কিরানা ঘরানার সর্বশ্রেষ্ঠ প্রতিনিধি এবং ভারতরত্ন জয়ী পণ্ডিত ভীমসেন জোশির প্রধান সঙ্গীত গুরু বা ওস্তাদ ছিলেন সোয়াই গান্ধর্ব, যিনি নিজেও এই ঘরানার একজন মহান শিল্পী ছিলেন।",
+    "question_en": "Under the direct tutelage and rigorous training of which master did Bharat Ratna Pandit Bhimsen Joshi, the foremost representative of the Kirana Gharana, receive his musical induction?",
+    "options_en": [
+      "Abdul Karim Khan",
+      "Sawai Gandharva",
+      "Abdul Wahid Khan",
+      "Kumar Gandharva"
+    ],
+    "explanation_en": "The primary guru and mentor of Pandit Bhimsen Joshi—the absolute peak of the Kirana Gharana who received the Bharat Ratna—was Sawai Gandharva, who himself was an illustrious master of the Kirana lineage.",
+    "correctIndex": 1
+  },
+  {
+    "id": 9,
+    "question_bn": "বেনারস বা বারাণসী শহর থেকে যে সমস্ত শাস্ত্রীয় শিল্প-ঐতিহ্যের ঘরানা বিকশিত হয়েছে, তাদের মধ্যে কোন শাখাটির প্রতিষ্ঠাতা হিসেবে পণ্ডিত রাম সহাই (Pt. Ram Sahai) ঐতিহাসিকভাবে সর্বজনস্বীকৃত?",
+    "options_bn": [
+      "বেনারস কথক ঘরানা",
+      "বেনারস খেয়াল ঘরানা",
+      "বেনারস তবলা ঘরানা",
+      "বেনারস শেহনাই ঘরানা"
+    ],
+    "explanation_bn": "বেনারস বা বারাণসী থেকে তিনটি আলাদা ঘরানার উৎপত্তি হয়েছে। এর মধ্যে বেনারস তবলা ঘরানার মূল আদি প্রতিষ্ঠাতা হলেন পণ্ডিত রাম সহাই। অন্যদিকে কথক শাখার প্রতিষ্ঠাতা হলেন জানকী প্রসাদ।",
+    "question_en": "Among the classical art traditions that developed from the city of Banaras, for which branch is Pandit Ram Sahai historically recognized as the founder?",
+    "options_en": [
+      "Banaras Kathak Gharana",
+      "Banaras Khayal Gharana",
+      "Banaras Tabla Gharana",
+      "Banaras Shehnai Gharana"
+    ],
+    "explanation_en": "Three distinct Gharanas originated from the city of Banaras. Among these, the main founder of the Banaras Tabla Gharana is Pandit Ram Sahai. On the other hand, the founder of the Kathak branch is Janaki Prasad.",
+    "correctIndex": 2
+  },
+  {
+    "id": 10,
+    "question_bn": "বিষ্ণু নারায়ণ ভাতখণ্ডে এবং বিষ্ণু দিগম্বর পালুস্কর—এই দুই মহান সাঙ্গীতিক ব্যক্তিত্বের বিশ শতকের প্রথমার্ধে আধুনিক ভারতীয় শাস্ত্রীয় সঙ্গীতের পুনরুজ্জীবনে প্রধান ঐতিহাসিক অবদান কী ছিল?",
+    "options_bn": [
+      "ভাতখণ্ডে দক্ষিণভারতীয় কর্নাটিক ঘরানা তৈরি করেন এবং পালুস্কর মুঘল দরবারের শেষ ধ্রুপদ তৈরি করেন",
+      "ভাতখণ্ডে রাগকে বৈজ্ঞানিক থাট পদ্ধতিতে শ্রেণিবদ্ধ করেন এবং পালুস্কর 1901 সালে গান্ধর্ব মহাবিদ্যালয় স্থাপন করে সাধারণ মানুষের কাছে প্রাতিষ্ঠানিক সঙ্গীতশিক্ষা পৌঁছে দেন",
+      "ভাতখণ্ডে প্রথম খেয়াল গান রচনা করেন এবং পালুস্কর তবলার পাঞ্জাব ঘরানা প্রতিষ্ঠা করেন",
+      "ভাতখণ্ডে চলচ্চিত্রের গানে শাস্ত্রীয় রাগের ব্যবহার শুরু করেন এবং পালুস্কর পারসিক সুরের প্রবর্তন করেন"
+    ],
+    "explanation_bn": "বিষ্ণু নারায়ণ ভাতখণ্ডে জটিল রাগকে থাটে শ্রেণিবদ্ধ করে ব্যাকরণ ও শিক্ষা সহজ করেছিলেন। অন্যদিকে, বিষ্ণু দিগম্বর পালুস্কর 1901 সালে লাহোরে গান্ধর্ব মহাবিদ্যালয় স্থাপন করে প্রথমবার দরবারের বাইরে সাধারণ মানুষের কাছে শাস্ত্রীয় সঙ্গীত প্রাতিষ্ঠানিকভাবে পৌঁছে দেন।",
+    "question_en": "What was the primary historical contribution of Vishnu Narayan Bhatkhande and Vishnu Digambar Paluskar toward the revival of modern Indian Classical Music in the early 20th century?",
+    "options_en": [
+      "Bhatkhande created the Southern Carnatic system and Paluskar composed the last court Dhrupad",
+      "Bhatkhande classified ragas into a systematic That framework and Paluskar established the Gandharva Mahavidyalaya in Lahore in 1901 to spread music education to the masses",
+      "Bhatkhande composed the first Khayal song and Paluskar founded the Punjab Gharana of Tabla",
+      "Bhatkhande started using classical ragas in cinema songs and Paluskar introduced Persian melodies"
+    ],
+    "explanation_en": "Vishnu Narayan Bhatkhande simplified music education by classifying complex ragas into a system of Thats. On the other hand, Vishnu Digambar Paluskar established the Gandharva Mahavidyalaya in Lahore in 1901 to institutionalize and take classical music to the general public outside royal courts.",
+    "correctIndex": 1
+  },
+  {
+    "id": 11,
+    "question_bn": "গোয়ালিয়র ঘরানার প্রাথমিক প্রাতিষ্ঠানিক ও গায়নশৈলীর কাঠামো যৌথভাবে গড়ে তোলার পেছনে নিচের কোন ওস্তাদদের অবদান ছিল?",
+    "options_bn": [
+      "আব্দুল করিম খাঁ, আব্দুল ওয়াহিদ খাঁ এবং হাসু খাঁ",
+      "হাসু খাঁ, হদ্দু খাঁ, নাথু খাঁ এবং নাথান পির বখশ",
+      "মিয়াঁ কাল্লু, ফতেহ আলি খাঁ এবং আলি বখশ খাঁ",
+      "ইনায়াত খাঁ, মেহবুব খাঁ এবং ছজ্জু খাঁ"
+    ],
+    "explanation_bn": "গোয়ালিয়র ঘরানার আদি কাঠামো গড়ে তোলার পেছনে যৌথ অবদান ছিল চারজন প্রধান ওস্তাদের—হাসু খাঁ, হদ্দু খাঁ ও নাথু খাঁ এবং নাথান পির বখশ। হাসু খাঁ ও হদ্দু খাঁ ভাই-জুটি হিসেবে একসাথে গাইতেন।",
+    "question_en": "Which of the following maestros jointly contributed to building the initial structure and vocal style of the Gwalior Gharana?",
+    "options_en": [
+      "Abdul Karim Khan, Abdul Wahid Khan, and Hassu Khan",
+      "Hassu Khan, Haddu Khan, Nathoo Khan, and Nathan Pir Baksh",
+      "Mian Kallu, Fateh Ali Khan, and Ali Baksh Khan",
+      "Inayat Khan, Mahbub Khan, and Chhajju Khan"
+    ],
+    "explanation_en": "The initial vocal and structural framework of the Gwalior Gharana was jointly built by four core masters—Hassu Khan, Haddu Khan, Nathoo Khan, and Nathan Pir Baksh. Hassu Khan and Haddu Khan were brothers who performed together as a duo.",
+    "correctIndex": 1
+  },
+  {
+    "id": 12,
+    "question_bn": "কর্্নাটিক সঙ্গীতের কিংবদন্তি ব্যক্তিত্ব এম.এস. সুব্বালক্ষ্মীকে সঙ্গীতের কোন বিশেষ সম্মানজনক উপাধিতে ভূষিত করা হয় এবং তাঁর একটি ঐতিহাসিক রাষ্ট্রীয় কৃতিত্ব কী?",
+    "options_bn": [
+      "কর্্নাটিক সঙ্গীতের জনক; তিনি প্রথম 4 লক্ষ কীর্তন রচনা করেন",
+      "কর্্নাটিক সঙ্গীতের রানি; তিনি প্রথম সঙ্গীতজ্ঞ হিসেবে ভারতরত্ন লাভ করেন",
+      "কর্্নাটিক সঙ্গীতের ত্রিমূর্তি; তিনি গান্ধর্ব মহাবিদ্যালয় স্থাপন করেন",
+      "20শ শতাব্দীর তানসেন; তিনি জুগলবন্দি গায়নের প্রবর্তক"
+    ],
+    "explanation_bn": "এম.এস. সুব্বালক্ষ্মীকে কর্নাটিক সঙ্গীতের রানি বলা হয়। তিনি ভারতের প্রথম সঙ্গীতজ্ঞ হিসেবে দেশের সর্বোচ্চ নাগরিক সম্মান 'ভারতরত্ন' লাভ করেন।",
+    "question_en": "By what unique title of honor is the legendary Carnatic music personality M.S. Subbulakshmi recognized, and what is one of her historic national achievements?",
+    "options_en": [
+      "Father of Carnatic Music; she composed 4 lakh Kirtans for the first time",
+      "Queen of Carnatic Music; she was the first musician to receive the Bharat Ratna",
+      "Trinity of Carnatic Music; she established the Gandharva Mahavidyalaya",
+      "Tansen of the 20th Century; she was the pioneer of Jugalbandi vocal style"
+    ],
+    "explanation_en": "M.S. Subbulakshmi is widely referred to as the Queen of Carnatic Music. She holds the historic national distinction of being the very first musician to be awarded India's highest civilian honor, the 'Bharat Ratna'.",
+    "correctIndex": 1
+  },
+  {
+    "id": 13,
+    "question_bn": "কথক নৃত্যের বিভিন্ন আঞ্চলিক ঘরানার মধ্যে 'তাণ্ডব' বা শক্তি ভাব এবং 'লাস্য' বা কোমল ভাব যথাক্রমে কোন দুটি ঘরানার প্রধান ঐতিহ্যগত বৈশিষ্ট্য?",
+    "options_bn": [
+      "তাণ্ডব ভাব লখনৌ ঘরানা এবং লাস্য ভাব জয়পুর ঘরানা",
+      "তাণ্ডব ভাব বেনারস ঘরানা এবং লাস্য ভাব রায়গড় ঘরানা",
+      "তাণ্ডব ভাব জয়পুর ঘরানা এবং লাস্য ভাব লখনৌ ঘরানা",
+      "তাণ্ডব ভাব রায়গড় ঘরানা এবং লাস্য ভাব বেনারস ঘরানা"
+    ],
+    "explanation_bn": "কথক নৃত্যের প্রধান চার ঘরানার মধ্যে জয়পুর ঘরানা তার তাণ্ডব (শক্তি) ভাব এবং মন্দির ঐতিহ্যের জন্য পরিচিত। অন্যদিকে লখনৌ ঘরানা তার লাস্য (কোমল) ভাব এবং অবধের দরবারি পরিশীলতার জন্য বিখ্যাত।",
+    "question_en": "Among the regional Gharanas of Kathak dance, the 'Tandava' aspect and 'Lasya' aspect are the primary traditional characteristics of which two Gharanas respectively?",
+    "options_en": [
+      "Tandava form in Lucknow Gharana and Lasya form in Jaipur Gharana",
+      "Tandava form in Banaras Gharana and Lasya form in Raigarh Gharana",
+      "Tandava form in Jaipur Gharana and Lasya form in Lucknow Gharana",
+      "Tandava form in Raigarh Gharana and Lasya form in Banaras Gharana"
+    ],
+    "explanation_en": "Among the four main Gharanas of Kathak, the Jaipur Gharana is characterized by the Tandava (vigorous/powerful) expression and temple traditions. Conversely, the Lucknow Gharana is defined by its Lasya (graceful/soft) emotion and courtly sophistication.",
+    "correctIndex": 2
+  },
+  {
+    "id": 14,
+    "question_bn": "ভারতীয় শাস্ত্রীয় সঙ্গীতের সাতটি মূল স্বর বা 'সপ্তক'-এর পূর্ণ নাম ও অর্থের তালিকায়, কোন স্বরটিকে 'ময়ূরের ডাক থেকে আহৃত' বলে মনে করা হয়?",
+    "options_bn": [
+      "ঋষভ",
+      "পঞ্চম",
+      "ধৈবত",
+      "নিষাদ"
+    ],
+    "explanation_bn": "স্বর সারণির বিবরণ অনুযায়ী, 'ধা' অর্থাৎ ধৈবত (Dhaivatham) স্বরটিকে ময়ূরের ডাক থেকে আহৃত বলে মনে করা হয়। অন্যদিকে নিষাদ (Ni) হাতির ডাক এবং ঋষভ (Re) ষাঁড়ের ডাকের সাথে সম্পর্কিত।",
+    "question_en": "In the full names and origins of the seven basic notes or 'Saptak' of Indian classical music, which note is traditionally believed to be derived from the 'cry of a peacock'?",
+    "options_en": [
+      "Rishabham (Re)",
+      "Panchamam (Pa)",
+      "Dhaivatham (Dha)",
+      "Nishadham (Ni)"
+    ],
+    "explanation_en": "According to the notes table, the short note 'Dha', which stands for 'Dhaivatham', is traditionally believed to be derived from the cry of a peacock. Meanwhile, Nishadham (Ni) is linked to an elephant and Rishabham (Re) to a bull.",
+    "correctIndex": 2
+  },
+  {
+    "id": 15,
+    "question_bn": "লখনৌ কথক ঘরানার সবচেয়ে উজ্জ্বল নক্ষত্র পণ্ডিত বিরজু মহারাজ কার পুত্র ছিলেন এবং অযোধ্যার কোন শেষ নবাব এই নৃত্যশৈলীর এক মহান ঐতিহাসিক পৃষ্ঠপোষক ছিলেন?",
+    "options_bn": [
+      "ঈশ্বরী প্রসাদ; রাজা রামচন্দ্র সিং",
+      "কালিকা প্রসাদ; নবাব ওয়াজিদ আলি শাহ",
+      "শম্ভু মহারাজ; সম্রাট আকবর",
+      "লচ্ছু মহারাজ; জানকী প্রসাদ"
+    ],
+    "explanation_bn": "পণ্ডিত বিরজু মহারাজ ছিলেন কালিকা প্রসাদের পুত্র এবং শম্ভু ও লচ্ছু মহারাজের ভাগ্নে। অযোধ্যার শেষ নবাব ওয়াজিদ আলি শাহ ছিলেন কথক নৃত্যের একজন মহান ঐতিহাসিক পৃষ্ঠপোষক ও ঠুমরি রচয়িতা।",
+    "question_en": "Pandit Birju Maharaj, the brightest exponent of the Lucknow Kathak Gharana, was the son of whom, and which last Nawab of Awadh was a great historical patron of this dance form?",
+    "options_en": [
+      "Ishwari Prasad; Raja Ramchandra Singh",
+      "Kalika Prasad; Nawab Wajid Ali Shah",
+      "Shambhu Maharaj; Emperor Akbar",
+      "Lacchu Maharaj; Janaki Prasad"
+    ],
+    "explanation_en": "Pandit Birju Maharaj was the son of Kalika Prasad and the nephew of Shambhu Maharaj and Lacchu Maharaj. The last Nawab of Awadh, Wajid Ali Shah, was a historic patron of Kathak dance and a composer of Thumri.",
+    "correctIndex": 1
+  },
+  {
+    "id": 16,
+    "question_bn": "ইন্দোর ঘরানার গায়নশৈলীটি অত্যন্ত ধীরলয়ী ও ভাবগম্ভীর খেয়ালের জন্য পরিচিত। এই ঘরানার মূল আদি প্রতিষ্ঠাতা ওস্তাদ কে ছিলেন?",
+    "options_bn": [
+      "উস্তাদ আমির খাঁ",
+      "উস্তাদ ছজ্জু খাঁ",
+      "হাজি সুজান খাঁ",
+      "উস্তাদ ইনায়াত খাঁ"
+    ],
+    "explanation_bn": "ইন্দোর ঘরানার প্রতিষ্ঠাতা হলেন উস্তাদ আমির খাঁ। এই ঘরানা অত্যন্ত ধীরলয়ী, ভাবগম্ভীর এবং মেলোডি-প্রধান খেয়াল গায়নের জন্য পরিচিত, যা তিনি ধ্যানের মতো পরিবেশন করতেন।",
+    "question_en": "The vocal style of the Indore Gharana is highly acclaimed for its meditative and slow-paced Khayal singing. Who was the core founder of this Gharana?",
+    "options_en": [
+      "Ustad Amir Khan",
+      "Ustad Chhajju Khan",
+      "Haji Sujan Khan",
+      "Ustad Inayat Khan"
+    ],
+    "explanation_en": "The founder of the Indore Gharana was Ustad Amir Khan. This Gharana is distinguished by its deeply slow-paced, grave, and melody-dominant Khayal presentation, which he delivered like a form of meditation.",
+    "correctIndex": 0
+  },
+  {
+    "id": 17,
+    "question_bn": "উত্তর প্রদেশের রামপুর জেলা থেকে উদ্ভূত 'রামপুর-সেহাসওয়ান ঘরানা'-র ওপর প্রধানত কোন প্রাচীন মাতৃ-ঘরানার গায়নশৈলীর স্পষ্ট প্রভাব লক্ষ্য করা যায়?",
+    "options_bn": [
+      "কিরানা ঘরানা",
+      "গোয়ালিয়র ঘরানা",
+      "পাতিয়ালা ঘরানা",
+      "ভেন্ডি বাজার ঘরানা"
+    ],
+    "explanation_bn": "রামপুর-সেহাসওয়ান ঘরানা উত্তর প্রদেশের রামপুর জেলা থেকে উদ্ভূত যার প্রতিষ্ঠাতা ইনায়াত খাঁ ও মেহবুব খাঁ। এই ঘরানার গায়নশৈলীতে 'গোয়ালিয়র ঘরানা'-র স্পষ্ট প্রভাব লক্ষ্য করা যায়।",
+    "question_en": "The 'Rampur-Sehaswan Gharana', which originated in the Rampur district of Uttar Pradesh, shows a prominent structural and stylistic influence from which ancient mother-Gharana?",
+    "options_en": [
+      "Kirana Gharana",
+      "Gwalior Gharana",
+      "Patiala Gharana",
+      "Bhendi Bazar Gharana"
+    ],
+    "explanation_en": "The Rampur-Sehaswan Gharana originated in the Rampur district of Uttar Pradesh and was founded by Inayat Khan and Mahbub Khan. The vocal rendering of this style shows a distinct and clear influence from the 'Gwalior Gharana'.",
+    "correctIndex": 1
+  },
+  {
+    "id": 18,
+    "question_bn": "ধ্রুপদ গায়নের জন্য বিখ্যাত বিহারের 'দরভাঙ্গা ঘরানা'-র আদি প্রতিষ্ঠাতা জোড়া ওস্তাদ বা সঙ্গীতজ্ঞ হিসেবে কাদের নাম উল্লেখ পাওয়া যায়?",
+    "options_bn": [
+      "হাসু খাঁ এবং হদ্দু খাঁ",
+      "রাধা কৃষ্ণ এবং কার্তা রাম",
+      "ইনায়াত খাঁ এবং মেহবুব খাঁ",
+      "উস্তাদ ছজ্জু খাঁ এবং সিধার খাঁ ঢাঢি"
+    ],
+    "explanation_bn": "দরভাঙ্গা ঘরানাটি বিহার থেকে উদ্ভূত এবং ধ্রুপদ সঙ্গীতের জন্য বিশেষ পরিচিত। এই ঘরানার প্রতিষ্ঠাতারা হলেন রাধা কৃষ্ণ এবং কার্তা রাম।",
+    "question_en": "Who are historically documented as the twin founding masters of the 'Darbhanga Gharana' of Bihar, which is celebrated for Dhrupad music?",
+    "options_en": [
+      "Hassu Khan and Haddu Khan",
+      "Radha Krishna and Karta Ram",
+      "Inayat Khan and Mahbub Khan",
+      "Ustad Chhajju Khan and Sidhar Khan Dhadi"
+    ],
+    "explanation_en": "The Darbhanga Gharana originated in Bihar and is uniquely recognized for its adherence to Dhrupad music. The twin founding architects of this Gharana are Radha Krishna and Karta Ram.",
+    "correctIndex": 1
+  },
+  {
+    "id": 19,
+    "question_bn": "মুম্বাইয়ের ভেন্ডি বাজার এলাকায় গড়ে ওঠা 'ভেন্ডি বাজার ঘরানা'-র মূল আদি প্রতিষ্ঠাতা কে ছিলেন, যিনি উত্তর প্রদেশের মুরাদাবাদ থেকে মুম্বাইতে এসেছিলেন?",
+    "options_bn": [
+      "উস্তাদ ছজ্জু খাঁ",
+      "সিধার খাঁ ঢাঢি",
+      "তানরাস খাঁ",
+      "ঘাগ্গে নাজির খাঁ"
+    ],
+    "explanation_bn": "ভেন্ডি বাজার ঘরানা মুম্বাইয়ের ভেন্ডি বাজার এলাকায় গড়ে ওঠা একটি বিশেষ ঘরানা। এর আদি মূল প্রতিষ্ঠাতা ছিলেন উস্তাদ ছজ্জু খাঁ, যিনি মুরাদাবাদ, উত্তর প্রদেশ থেকে মুম্বাইতে চলে এসেছিলেন।",
+    "question_en": "Who was the original founder of the 'Bhendi Bazar Gharana' that flourished in the Bhendi Bazar area of Mumbai, having migrated there from Moradabad, Uttar Pradesh?",
+    "options_en": [
+      "Ustad Chhajju Khan",
+      "Sidhar Khan Dhadi",
+      "Tanras Khan",
+      "Ghagge Nazir Khan"
+    ],
+    "explanation_en": "The Bhendi Bazar Gharana developed as a distinct school of music within the Bhendi Bazar locality of Mumbai. Its original founder was Ustad Chhajju Khan, who migrated to Mumbai from Moradabad, Uttar Pradesh.",
+    "correctIndex": 0
+  },
+  {
+    "id": 20,
+    "question_bn": "ধ্রুপদ গায়নে ভারতজুড়ে অনন্য কীর্তি স্থাপনকারী এবং 2012 সালে ভারত সরকার কর্তৃক 'পদ্মশ্রী' পুরস্কারে সম্মানিত 'গুন্দেচা ব্রাদার্স' (Gundecha Brothers) কোন সুপরিচিত ধ্রুপদ ঘরানার সর্বশ্রেষ্ঠ আধুনিক প্রতিনিধি?",
+    "options_bn": [
+      "গোয়ালিয়র ঘরানা",
+      "দরভাঙ্গা ঘরানা",
+      "দাগর ঘরানা",
+      "দিল্লি ঘরানা"
+    ],
+    "explanation_bn": "দাগর ঘরানা মূলত ধ্রুপদ গায়নের জন্য সবচেয়ে বিখ্যাত ঘরানা। এই ঘরানার সবচেয়ে উজ্জ্বল ও উল্লেখযোগ্য আধুনিক শিল্পী হলেন গুন্দেচা ব্রাদার্স, যারা 2012 সালে পদ্মশ্রী পুরস্কার লাভ করেন।",
+    "question_en": "The 'Gundecha Brothers', who achieved nationwide acclaim for Dhrupad singing and were honored with the 'Padma Shri' award in 2012, are the foremost modern representatives of which traditional Dhrupad Gharana?",
+    "options_en": [
+      "Gwalior Gharana",
+      "Darbhanga Gharana",
+      "Dagar Gharana",
+      "Delhi Gharana"
+    ],
+    "explanation_en": "The Dagar Gharana is one of the most celebrated schools dedicated exclusively to Dhrupad vocal music. The most prominent modern exponents of this lineage are the Gundecha Brothers, who were awarded the Padma Shri by the Government of India in 2012.",
+    "correctIndex": 2
+  }
+];
+
+// PERSISTENCE KEYS
+const SESSION_KEY = 'quiz_session_v1_dl';
+const TIMER_KEY = 'quiz_end_time_dl';
+const ANSWERS_KEY = 'quiz_answers_dl';
+
+// =========================================
+// 2. PARSER SERVICE (No longer explicitly needed if pre-parsed, but kept for fallback)
+// =========================================
+const parseQuizText = (text) => {
+  if (!text) return [];
+  const normalizedText = text.replace(/\r\n/g, '\n');
+  const blocks = normalizedText.split(/\n(?=Q?\d+\.)/);
+  
+  const parsedQuestions = [];
+
+  blocks.forEach((block, index) => {
+    if (!block.trim()) return;
+
+    // Detect format
+    const isNewFormat = block.includes("Options (choose one):");
+
+    let qEn = "Question missing";
+    let optsEn = [];
+    let correctIndex = 0;
+    let expEn = "";
+
+    if (isNewFormat) {
+        // NEW PARAJUMBLE FORMAT
+        const qMatch = block.match(/(?:Q?\d+\.\s*)?([\s\S]*?)(?=\nOptions \(choose one\):)/i);
+        qEn = qMatch ? qMatch[1].trim() : "Question text missing";
+  
+        const optSectionMatch = block.match(/Options \(choose one\):\s*([\s\S]*?)(?=\nCorrect option:)/i);
+        if (optSectionMatch) {
+          optsEn = optSectionMatch[1]
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0)
+            .map(line => line.replace(/^([A-Za-z0-9]+)[\.\)]\s*/, ''));
+        }
+  
+        const ansMatch = block.match(/Correct option:\s*(.*?)(?=\nExplanation:|$)/i);
+        const correctValue = ansMatch ? ansMatch[1].trim() : "";
+        
+        correctIndex = optsEn.findIndex(opt => opt.replace(/\s/g, '') === correctValue.replace(/\s/g, ''));
+        if (correctIndex === -1) correctIndex = 0;
+  
+        const expMatch = block.match(/Explanation:\s*([\s\S]*?)(?=$)/i);
+        expEn = expMatch ? expMatch[1].trim() : "";
+      
+        parsedQuestions.push({
+          id: index + 1,
+          question_bn: "",
+          options_bn: optsEn,
+          explanation_bn: "",
+          question_en: qEn,
+          options_en: optsEn,
+          explanation_en: expEn,
+          correctIndex: correctIndex >= 0 ? correctIndex : 0
+        });
+  
+    } else {
+      // OLD FORMAT FALLBACK
+      const bnSectionMatch = block.match(/প্রশ্ন:\s*([\s\S]*?)(?=\nQuestion:|$)/);
+      const bnSection = bnSectionMatch ? bnSectionMatch[0] : '';
+      
+      const enSectionMatch = block.match(/Question:\s*([\s\S]*?)(?=\nAnswer:|$)/);
+      const enSection = enSectionMatch ? enSectionMatch[0] : '';
+
+      const qBn = bnSection.match(/প্রশ্ন:\s*([\s\S]*?)(?=\n\(A\))/)?.[1]?.trim() || "";
+      let qEn = enSection.match(/Question:\s*([\s\S]*?)(?=\n\(A\))/)?.[1]?.trim() || "";
+      
+      if (!qEn && !qBn) {
+          const genericQMatch = block.match(/(?:Q?\d+\.\s*)?([\s\S]*?)(?=\n\(A\))/);
+          qEn = genericQMatch ? genericQMatch[1].trim() : "Question missing";
+      }
+
+      const cleanSection = (txt) => {
+         return txt.replace(/\n(?:Answer|উত্তর|Correct option|Explanation|ব্যাখ্যা):[\s\S]*$/i, '');
+      };
+
+      const extractOptions = (section) => {
+          const matches = [...section.matchAll(/\([A-D]\)\s*(.*?)(?=\n\(|\nউত্তর:|\nQuestion:|\nAnswer:|\nCorrect|\nব্যাখ্যা:|$)/g)];
+          return matches.map(m => m[1].trim());
+      };
+
+      const optsBn = extractOptions(cleanSection(bnSection));
+      let optsEn = extractOptions(cleanSection(enSection));
+
+      if (optsEn.length === 0 && !bnSection) {
+          optsEn = extractOptions(cleanSection(block));
+      }
+
+      const ansMatch = block.match(/(?:Answer|উত্তর|Correct option):\s*(?:\()([A-D])(?:\))/i);
+      const ansChar = ansMatch ? ansMatch[1] : 'A';
+      correctIndex = ansChar.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+
+      const expBnMatch = block.match(/(?:ব্যাখ্যা):\s*([\s\S]*?)(?=\nQuestion:|$)/i);
+      const expEnMatch = block.match(/(?:Explanation):\s*([\s\S]*?)(?=$)/i);
+      
+      const expBn = expBnMatch ? expBnMatch[1].trim() : "";
+      const expEn = expEnMatch ? expEnMatch[1].trim() : "";
+
+      parsedQuestions.push({
+        id: index + 1,
+        question_bn: qBn,
+        options_bn: optsBn,
+        explanation_bn: expBn,
+        question_en: qEn,
+        options_en: optsEn,
+        explanation_en: expEn,
+        correctIndex: correctIndex >= 0 ? correctIndex : 0
+      });
+    }
+  });
+
+  return parsedQuestions;
+};
+
+// =========================================
+// 3. API SERVICE
+// =========================================
+const submitScoreToSheet = async (name, score, total) => {
+  if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_YOUR")) {
+    console.warn("Google Script URL not configured.");
+    return false;
+  }
+  const percentage = ((score / total) * 100).toFixed(2);
+  const timestamp = new Date().toLocaleString();
+  const payload = { time: timestamp, name: name, score: score.toFixed(2), total: total, percentage: percentage };
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    return true;
+  } catch (error) {
+    console.error("Failed to submit score", error);
+    return false;
+  }
+};
+
+// =========================================
+// 4. COMPONENTS
+// =========================================
+const { useState, useEffect, useMemo, useRef } = React;
+
+const Quiz = ({ questions, config, initialLang, onComplete }) => {
+  const [lang, setLang] = useState(initialLang);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Initialize Answers from LocalStorage
+  const [userAnswers, setUserAnswers] = useState(() => {
+      try {
+        const saved = localStorage.getItem(ANSWERS_KEY);
+        return saved ? JSON.parse(saved) : {};
+      } catch (e) { return {}; }
+  });
+  
+  const answersRef = useRef(userAnswers);
+  useEffect(() => {
+      answersRef.current = userAnswers;
+  }, [userAnswers]);
+
+  useEffect(() => {
+    let targetTime;
+    const storedEndTime = localStorage.getItem(TIMER_KEY);
+
+    if (storedEndTime) {
+      targetTime = parseInt(storedEndTime, 10);
+    } else {
+      targetTime = Date.now() + config.totalTime * 1000;
+      localStorage.setItem(TIMER_KEY, targetTime.toString());
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const secondsLeft = Math.max(0, Math.floor((targetTime - now) / 1000));
+      setTimeLeft(secondsLeft);
+      if (secondsLeft <= 0) return true; 
+      return false; 
+    };
+
+    const autoSubmit = () => {
+       onComplete(answersRef.current);
+    };
+
+    if (updateTimer()) {
+        autoSubmit();
+        return;
+    }
+
+    const timer = setInterval(() => {
+      if (updateTimer()) {
+        clearInterval(timer);
+        autoSubmit();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ANSWERS_KEY, JSON.stringify(userAnswers));
+  }, [userAnswers]);
+
+  const toggleOption = (qIndex, optIndex) => {
+    setUserAnswers((prev) => {
+      const current = prev[qIndex];
+      const newState = { ...prev };
+      if (current === optIndex) {
+        delete newState[qIndex];
+      } else {
+        newState[qIndex] = optIndex;
+      }
+      return newState;
+    });
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className="main-wrapper screen active" style={{ display: 'flex' }}>
+      <div className="sticky-header">
+        <div className="timer-box">
+          ⏱ {formatTime(timeLeft)}
+        </div>
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+          style={{ padding: '5px', fontSize: '1rem' }}
+        >
+          <option value="en">English</option>
+          <option value="bn">বাংলা</option>
+        </select>
+      </div>
+
+      <div style={{ padding: '0 20px', flex: 1 }}>
+        {questions.map((q, idx) => {
+          const qText = (lang === 'bn' && q.question_bn) ? q.question_bn : q.question_en;
+          const options = (lang === 'bn' && q.options_bn && q.options_bn.length) ? q.options_bn : q.options_en;
+          const selected = userAnswers[idx];
+
+          return (
+            <div key={q.id} className="question-container">
+              <div className="question-text">Q{idx + 1}. {qText}</div>
+              <div className="options-grid">
+                {options && options.map((opt, optIdx) => (
+                  <div
+                    key={optIdx}
+                    onClick={() => toggleOption(idx, optIdx)}
+                    className={`option ${selected === optIdx ? 'selected' : ''}`}
+                  >
+                    <span style={{ fontWeight: 'bold', marginRight: '8px' }}>
+                      {String.fromCharCode(65 + optIdx)}.
+                    </span>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: '20px', background: 'white', borderTop: '1px solid #ddd' }}>
+        <button onClick={() => onComplete(userAnswers)}>
+          Submit Exam
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const Result = ({ questions, userAnswers, config, studentName, initialLang, onRetake }) => {
+  const [submissionStatus, setSubmissionStatus] = useState("Sending data...");
+  const [score, setScore] = useState(0);
+  const [lang, setLang] = useState(initialLang);
+
+  const totalPossible = questions.length * config.marksCorrect;
+
+  useEffect(() => {
+    let calculatedScore = 0;
+    questions.forEach((q, idx) => {
+      const userChoice = userAnswers[idx];
+      if (userChoice !== undefined) {
+        if (userChoice === q.correctIndex) {
+          calculatedScore += config.marksCorrect;
+        } else {
+          calculatedScore += config.marksWrong;
+        }
+      }
+    });
+    setScore(calculatedScore);
+
+    submitScoreToSheet(studentName, calculatedScore, totalPossible).then((success) => {
+      setSubmissionStatus(success ? "✅ Score saved successfully!" : "⚠️ Saved locally (Connection failed)");
+    });
+  }, []);
+
+  return (
+    <div className="main-wrapper screen active">
+      <div className="card">
+        <h2>Result Summary</h2>
+        <div style={{ fontSize: '2rem', color: 'var(--accent-color)', fontWeight: 'bold' }}>
+          {score.toFixed(1)} <span style={{ fontSize: '1rem', color: '#666' }}>/ {totalPossible}</span>
+        </div>
+        <p>Student: <strong>{studentName}</strong></p>
+        <p style={{ color: submissionStatus.includes('✅') ? 'green' : 'orange', fontWeight: 'bold' }}>
+          {submissionStatus}
+        </p>
+        <button onClick={onRetake} style={{ marginTop: '20px' }}>Take Quiz Again</button>
+      </div>
+
+      <div style={{ padding: '20px' }}>
+        <h3>Detailed Review</h3>
+        <div style={{marginBottom: '10px'}}>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              style={{ padding: '5px' }}
+            >
+              <option value="en">English</option>
+              <option value="bn">বাংলা</option>
+            </select>
+        </div>
+        {questions.map((q, idx) => {
+           const qText = (lang === 'bn' && q.question_bn) ? q.question_bn : q.question_en;
+           const options = (lang === 'bn' && q.options_bn && q.options_bn.length) ? q.options_bn : q.options_en;
+           const exp = (lang === 'bn' && q.explanation_bn) ? q.explanation_bn : q.explanation_en;
+
+           const userChoice = userAnswers[idx];
+           const isAttempted = userChoice !== undefined;
+           const isCorrect = isAttempted && userChoice === q.correctIndex;
+
+           let statusClass = "status-unanswered";
+           let statusText = "Skipped";
+
+           if (isAttempted) {
+             if (isCorrect) {
+               statusClass = "status-correct";
+               statusText = `Correct (+${config.marksCorrect})`;
+             } else {
+               statusClass = "status-wrong";
+               statusText = `Wrong (${config.marksWrong})`;
+             }
+           }
+
+           return (
+             <div key={q.id} className="review-item">
+               <p style={{whiteSpace: 'pre-wrap'}}><strong>Q{idx+1}:</strong> {qText}</p>
+               <p className={statusClass}>Status: {statusText}</p>
+               <p>Correct: <strong>{options && options[q.correctIndex]}</strong></p>
+               {isAttempted && <p>You Selected: {options && options[userChoice]}</p>}
+               <div className="explanation">
+                 <strong>Explanation:</strong> {exp || "N/A"}
+               </div>
+             </div>
+           );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- APP COMPONENT ---
+const App = () => {
+  const session = useMemo(() => {
+    try {
+      const s = localStorage.getItem(SESSION_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch(e) { return null; }
+  }, []);
+
+  const [screen, setScreen] = useState(session && session.isActive ? 'QUIZ' : 'LANDING'); 
+  const [name, setName] = useState(session ? session.name : '');
+  const [lang, setLang] = useState(DEFAULT_LANGUAGE);
+  const [userAnswers, setUserAnswers] = useState({});
+
+  useEffect(() => {
+    if (screen === 'QUIZ') {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ isActive: true, name: name }));
+    }
+  }, [screen, name]);
+
+  const questions = useMemo(() => {
+    const all = window.__PREPARSED_JSON__ && window.__PREPARSED_JSON__.length > 0 
+      ? window.__PREPARSED_JSON__ 
+      : parseQuizText(DEFAULT_RAW_TEXT);
+      
+    if (!all || all.length === 0) {
+        return [{
+            id: 1, question_bn: "No questions provided.", options_bn: ["A", "B", "C", "D"],
+            explanation_bn: "", question_en: "No questions provided.", options_en: ["A", "B", "C", "D"],
+            explanation_en: "", correctIndex: 0
+        }];
+    }
+    return (DEFAULT_CONFIG.maxQuestions && DEFAULT_CONFIG.maxQuestions > 0) 
+      ? all.slice(0, DEFAULT_CONFIG.maxQuestions) 
+      : all;
+  }, []);
+
+  const handleStart = () => {
+    if (!name.trim()) {
+      alert("Please enter your Name.");
+      return;
+    }
+    // Clear any stale timer/answer data from a previous crashed session
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem(ANSWERS_KEY);
+    setScreen('QUIZ');
+  };
+
+  const handleComplete = (answers) => {
+     localStorage.removeItem(SESSION_KEY);
+     localStorage.removeItem(TIMER_KEY);
+     localStorage.removeItem(ANSWERS_KEY);
+     setUserAnswers(answers);
+     setScreen('RESULT');
+  };
+
+  const handleRetake = () => {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem(ANSWERS_KEY);
+    setUserAnswers({});
+    setScreen('LANDING');
+  };
+
+  return (
+    <div className="main-wrapper" style={{ minHeight: '100vh', justifyContent: screen === 'LANDING' ? 'center' : 'flex-start' }}>
+      {screen === 'LANDING' && (
+        <div className="card" style={{ maxWidth: '400px', margin: '0 auto' }}>
+          <h1>{APP_TITLE}</h1>
+          <p className="subtitle">{APP_SUBTITLE}</p>
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Student Name</label>
+            <input 
+              type="text" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
+              style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+            />
+          </div>
+          
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+             <label style={{ display: 'block', marginBottom: '5px' }}>Language</label>
+             <select 
+               value={lang} 
+               onChange={(e) => setLang(e.target.value)}
+               style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+             >
+                <option value="en">English</option>
+                <option value="bn">বাংলা</option>
+             </select>
+          </div>
+
+          <button onClick={handleStart}>Start Quiz</button>
+        </div>
+      )}
+      {screen === 'QUIZ' && (
+        <Quiz 
+          questions={questions}
+          config={DEFAULT_CONFIG}
+          initialLang={lang}
+          onComplete={handleComplete}
+        />
+      )}
+      {screen === 'RESULT' && (
+        <Result 
+          questions={questions}
+          userAnswers={userAnswers}
+          config={DEFAULT_CONFIG}
+          studentName={name}
+          initialLang={lang}
+          onRetake={handleRetake}
+        />
+      )}
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+  </script>
+</body>
+</html>
